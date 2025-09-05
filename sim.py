@@ -1,7 +1,47 @@
+import time
+import numpy as np
+
+# to set up the venv:
+# python3 -m venv .venv
+# source .venv/bin/activate
+# python3 -m pip install numpy
+
 def reverse(str):
     return str[::-1]
 
 class numberWithEcc:
+    G_matrix = np.array([[1,0,0,1,1,0],
+                         [1,0,0,1,0,1],
+                         [1,0,0,1,0,0],
+                         [1,0,0,0,1,1],
+                         [1,0,0,0,1,0],
+                         [1,0,0,0,0,1],
+                         [0,1,1,1,1,1],
+                         [0,1,1,1,1,0],
+                         [0,1,1,1,0,1],
+                         [0,1,1,1,0,0],
+                         [0,1,1,0,1,1],
+                         [0,1,1,0,1,0],
+                         [0,1,1,0,0,1],
+                         [0,1,1,0,0,0],
+                         [0,1,0,1,1,1],
+                         [0,1,0,1,1,0],
+                         [0,1,0,1,0,1],
+                         [0,1,0,1,0,0],
+                         [0,1,0,0,1,1],
+                         [0,1,0,0,1,0],
+                         [0,1,0,0,0,1],
+                         [0,0,1,1,1,1],
+                         [0,0,1,1,1,0],
+                         [0,0,1,1,0,1],
+                         [0,0,1,1,0,0],
+                         [0,0,1,0,1,1],
+                         [0,0,1,0,1,0],
+                         [0,0,1,0,0,1],
+                         [0,0,0,1,1,1],
+                         [0,0,0,1,1,0],
+                         [0,0,0,1,0,1],
+                         [0,0,0,0,1,1]])
     def __init__(self, value, address=0, odd_parity=True):
         self.address = address
         self.odd_parity = odd_parity
@@ -18,6 +58,7 @@ class numberWithEcc:
         self.address_parity = 0
         self.write(value, address) # calculate ecc, parity
 
+
     def count_ones(self):
         self.num_ones = bin(self.dw).count('1') + bin(self.ecc).count('1') + bin(self.parity).count('1') 
 
@@ -32,13 +73,13 @@ class numberWithEcc:
             self.address_parity = 1 - self.address_parity
 
     def write(self, value, address=0):
-        self.set_data(value)
-        self.calc_ecc()
-        self.calculate_parity(self.odd_parity)
-        self.address = address
-        self.calculate_address_parity()
+        self.set_data(value)         # 0
+        self.calc_ecc()              # 0.32
+        self.calculate_parity(self.odd_parity)  # 0.01
+        self.address = address       # 0
+        self.calculate_address_parity()  # 0.005
         self.dw = self.in_value ^ (address*2 + self.address_parity)
-        self.count_ones()
+        self.count_ones()            # 0.01
     
     def set_data(self, value):
         self.in_value = value
@@ -128,14 +169,81 @@ class numberWithEcc:
     
         # Convert binary to decimal
         return res
-    
-    def calc_ecc(self):
+
+    def calc_ecc(self, do_print=False):
+        self.ecc = self.calc_ecc_matrix(do_print)
+        return self.ecc
+
+    def calc_ecc_matrix(self, do_print=False):
+
+        d = bin(self.in_value)
+        d = [int(i) for i in format(self.in_value, '032b')]
+
+
+        C = np.dot(d, self.G_matrix) % 2
+        ecc=0
+        for i in range(0, self.hamming_bits):
+            ecc |= C[i] << i
+
+        if do_print:
+            print(f"ECC matrix method data {self.in_value} {d} ecc bin {C} ecc dec {ecc}")
+        return ecc
+
+    def calc_ecc_xor(self, do_print=False):
+        d = [0] * self.data_bits
+        for i in range(0, self.data_bits):
+            d[i] = bool((self.in_value & (1 << i)) >> i)
+        # these are wrong:
+        p1 = d[0] ^ d[1] ^ d[3] ^ d[4] ^ d[6] ^ d[8] ^ d[10] ^ d[11] ^ d[13] ^ d[15] ^ d[17] ^ d[19] ^ d[21] ^ d[23] ^ d[25] ^ d[26] ^ d[28] ^ d[30] 
+        p2 = d[0] ^ d[2] ^ d[3] ^ d[5] ^ d[9] ^ d[10] ^ d[12] ^ d[13] ^ d[16] ^ d[17] ^ d[20] ^ d[21] ^ d[24] ^ d[25] ^ d[27] ^ d[28] ^ d[31] 
+        p4 = d[0] ^ d[2] ^ d[3] ^ d[5] ^ d[9] ^ d[10] ^ d[12] ^ d[13] ^ d[16] ^ d[17] ^ d[20] ^ d[21] ^ d[24] ^ d[25] ^ d[27] ^ d[28] ^ d[31] 
+        p8 = d[0] ^ d[2] ^ d[3] ^ d[5] ^ d[9] ^ d[10] ^ d[12] ^ d[13] ^ d[16] ^ d[17] ^ d[20] ^ d[21] ^ d[24] ^ d[25] ^ d[27] ^ d[28] ^ d[31] 
+        p16 = d[0] ^ d[2] ^ d[3] ^ d[5] ^ d[9] ^ d[10] ^ d[12] ^ d[13] ^ d[16] ^ d[17] ^ d[20] ^ d[21] ^ d[24] ^ d[25] ^ d[27] ^ d[28] ^ d[31] 
+        p32 = d[0] ^ d[2] ^ d[3] ^ d[5] ^ d[9] ^ d[10] ^ d[12] ^ d[13] ^ d[16] ^ d[17] ^ d[20] ^ d[21] ^ d[24] ^ d[25] ^ d[27] ^ d[28] ^ d[31] 
+        if do_print:
+            d_str = "".join("%d" % d[i] for i in range(0, self.data_bits))
+            print(f"data {self.in_value} {d_str}  p1 {int(p1)} p2 {int(p2)} p4 {int(p4)} p8 {int(p8)} p16 {int(p16)} p32 {int(p32)}")
+        return(p1 + 2 * p2 + 4 * p4 + 8 * p8 + 16 * p16 + 32 * p32)
+                                                                                                                                         
+
+
+
+    def calc_ecc2(self):
+        # about 1s per 100k
         data_str = "{:032b}".format(self.in_value)
-        arrx = self.posRedundantBits(data_str,r=6, pchar="x")
+        data_list = list(map(int, data_str))
+        n = len(data_list)
+        p = 0
+        while (2**p) < n + p + 1:
+            p += 1
+
+        hamming_code = [0] * (n + p)
+        data_index = 0
+
+        for i in range(1, n + p + 1):
+            if (i & (i - 1) == 0):
+                continue
+            hamming_code[i - 1] = data_list[data_index]
+            data_index += 1
+
+        for i in range(p):
+            parity_pos = 2**i
+            parity = 0
+            for j in range(1, n + p + 1):
+                if (j & parity_pos) != 0:
+                    parity ^= hamming_code[j - 1]
+            hamming_code[parity_pos - 1] = parity
+
+        return "".join(map(str, hamming_code))
+    
+    def calc_ecc_old(self):
+        # time is about 2s per 100k
+        data_str = "{:032b}".format(self.in_value)
+        #arrx = self.posRedundantBits(data_str,r=6, pchar="x")
         arr = self.posRedundantBits(data_str,r=6, pchar="0")
         arr2 = self.calcParityBits(arr, r=6)
         h = self.getHamming(arr2, r=6)
-        self.ecc = int(h, 2)
+        return int(h, 2)
 
     def print_monia_order(self, header=True, print_hex=False):
         self.print(header, print_hex, True)
@@ -293,18 +401,20 @@ def test_injection():
 def count_all_single_ones():
     ones_cases = []
     data_bits = 32
+    
     data = numberWithEcc(value=0, address=0)
     j=0
     for i in range(0, 2**data_bits):
         for a in range(0, 2**data.address_bits):
-            data = numberWithEcc(value=i, address=a)
+            #data = numberWithEcc(value=i, address=a)
+            data.write(i, a)
             # data.print(header=False)
             if data.num_ones == 1:
                 print(f"found one case: address={a} data={i}")
                 data.print(header=True, print_hex=True)
                 ones_cases.append({"data":i, "address":a})
             j += 1
-            if j % 100000 == 0:
+            if j % 500000 == 0:
                 print(f"i={i} / {2**data_bits} a="+ "{:4d}".format(a)  + " %.6f"%(100*i/(2**data_bits)) + f"% found "+str(len(ones_cases))+" cases" + "(0x{:08x})".format(i) + " " + str(int.bit_length(i)) + " bits" )  
 
     if True:
@@ -326,7 +436,55 @@ def count_all_single_ones():
         print( f"total cases: {len(ones_cases)} out of {2**data.address_bits} addresses and {2**data.address_bits * 2**data_bits} total values")
         print( f"unique addresses: {len(unique_addresses)}")
 
-    
+    # killed at address 0x0554012e
+
+def timing_test():
+    data = numberWithEcc(value=0, address=0)
+    n=100000
+    start_time = time.perf_counter()
+    for i in range(0, n):
+        # data.print(header=False)
+        data.set_data(i)
+        data.count_ones()
+    end_time = time.perf_counter()
+    run_time_test = end_time - start_time
+    print(f"run time with function under test: {run_time_test}")
+
+    start_time = time.perf_counter()
+    for i in range(0, n):
+        # data.print(header=False)
+        data.set_data(i)
+    end_time = time.perf_counter()
+    run_time = end_time - start_time
+    print(f"run time without anything:: {run_time}")
+    print(f"run time function under test: {run_time_test-run_time}")
+
+    start_time = time.perf_counter()
+    for i in range(0, n):
+        # data.print(header=False)
+        data.write(i)
+    end_time = time.perf_counter()
+    run_time = end_time - start_time
+    print(f"run time write data: {run_time}")
+
+    # validate wakling
+    for i in range(0, 32):
+        # data.print(header=False)
+        data.set_data(2**i)
+        data.calc_ecc_old()
+        if data.calc_ecc() != data.ecc:
+            data.print(header=True)
+            data.calc_ecc(True)
+            print(f"error i={i}, data.ecc={data.ecc} data.calc_ecc()={data.calc_ecc()}"  )
+
+    # validate counting
+    for i in range(0, 2000):
+        # data.print(header=False)
+        data.set_data(i)
+        data.calc_ecc_old()
+        if data.calc_ecc() != data.ecc:
+            data.print(header=True)
+            print(f"error i={i}, data.ecc={data.ecc} data.calc_ecc()={data.calc_ecc()}"  )
 
 
 def main():
@@ -335,6 +493,8 @@ def main():
     # test_hamming()
 
     # test_hashing()
+
+    # timing_test()
 
     count_all_single_ones()
 

@@ -1,0 +1,3 @@
+[submodule "JulianBaileyUseful"]
+	path = JulianBaileyUseful
+	url = git@github.com:sifive/JulianBaileyUseful.git
