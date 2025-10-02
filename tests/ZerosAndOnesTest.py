@@ -1,5 +1,6 @@
 import numpy as np
-
+import time
+import random
 
 
 
@@ -58,19 +59,30 @@ class ZerosAndOnesTest:
 
         return (all_zero, all_one)
     
-    def runTestAllAC(self, print_all = True, print_errors = True, random_order = False, print_skip=100000):
+    def runTestAllAC(self, print_all = True, print_errors = True, random_order = False, print_skip=100000, max_run_time=1e99):
         all_zero_count = 0
         all_one_count = 0
         bits = self.code.totalWidth
         print_header = True
-        tests = 1 << bits
+        start_time = time.time()
 
-        if random_order:
+        if bits > 30:
+            print("WARNING: Switching to the incomplete random scheme as the full random scheme will take too long to generate.")
+            random_complete=False
+        else:
+            random_complete=True
+
+        if random_order and random_complete:
             rng = np.random.default_rng()
             bit_range = rng.permutation(1<<bits)
+        elif random_order and not random_complete:
+            print("Generating random data...")
+            bit_range = []
+            for i in range(0, int(max_run_time * 1e5)):
+                bit_range.append(random.randint(0, 1<<bits-1))
         else:
             bit_range = range(0, 1<<bits)
-
+        tests = len(bit_range)
         i=0
         for d in bit_range :
             data = (d >> self.code.aWidth) & ((1<<self.code.dWidth)-1)
@@ -82,6 +94,9 @@ class ZerosAndOnesTest:
             all_one_count += all_one
             print_header = False
             i += 1
+            if time.time() - start_time > max_run_time:
+                print(f"  max run time reached")
+                break
 
         if all_zero_count != 0 or all_one_count != 0:
             print(f"FAIL: Some encodings were all zero or all ones")
@@ -90,13 +105,13 @@ class ZerosAndOnesTest:
         else:
             print(f"PASS: No encodings were all zero or all ones")
 
-    def runTestAllBinAC(self, print_all = True, print_errors = True):
-        self.runTestAllAC(print_all, print_errors, random_order = False)
+    def runTestAllBinAC(self, print_all = True, print_errors = True, max_run_time=1e99):
+        self.runTestAllAC(print_all, print_errors, random_order = False, max_run_time=max_run_time)
 
-    def runTestAllRandAC(self, print_all = True, print_errors = True, print_skip=100000):
+    def runTestAllRandAC(self, print_all = True, print_errors = True, print_skip=100000, max_run_time=1e99):
         print("running AllRandomAC test...")
 
-        self.runTestAllAC(print_all, print_errors, random_order = True, print_skip=print_skip)
+        self.runTestAllAC(print_all, print_errors, random_order = True, print_skip=print_skip, max_run_time=max_run_time)
 
 
 
@@ -251,7 +266,7 @@ class ZerosAndOnesTest:
         else:
             print(f"PASS: No encodings were all zero or all ones")
 
-    def runTestAllSingleBitInjectionsAC(self, print_all = True, print_errors = True, random_order = False, print_skip=100000, count_addr_as_fail=True):
+    def runTestAllSingleBitInjectionsAC(self, print_all = True, print_errors = True, random_order = False, print_skip=100000, count_addr_as_fail=True, max_run_time=1e99):
         print("running AllSingleBitInjectionsAC injection test...")
         all_zero_count = 0
         all_one_count = 0
@@ -261,13 +276,28 @@ class ZerosAndOnesTest:
         bits = self.code.totalWidth
         print_header = True
         i=0
-        tests = (1 << bits) * bits
+        start_time = time.time()
+        max_time_reached = False
+        if bits > 30:
+            print("WARNING: Switching to the incomplete random scheme as the full random scheme will take too long to generate.")
+            random_complete=False
+        else:
+            random_complete=True
 
-        if random_order:
+        if random_order and random_complete:
             rng = np.random.default_rng()
             dataRange = rng.permutation(1<<bits)
+        elif random_order and not random_complete:
+            #rng = np.random.default_rng()
+            #dataRange = rng.integers(1<<bits, size=int(max_run_time * 1e6))
+            print("Generating random data...")
+            dataRange = []
+            for i in range(0, int(max_run_time * 1e4)):
+                dataRange.append(random.randint(0, 1<<bits-1))
         else:
             dataRange = range(0, 1<<bits)
+        tests = len(dataRange) * bits
+        print("Starting tests...")
         for unencData in dataRange:
             for bit in range(0, self.code.encodedWidth()):
                 if i%print_skip==0:
@@ -280,6 +310,12 @@ class ZerosAndOnesTest:
                 fail_count += test_fail
                 print_header = False
                 i += 1
+                if time.time() - start_time > max_run_time:
+                    print(f"  max run time reached")
+                    max_time_reached = True
+                    break
+            if max_time_reached:
+                break
                 
 
         if all_zero_count != 0 or all_one_count != 0 or fail_count != 0:
@@ -290,7 +326,7 @@ class ZerosAndOnesTest:
         else:
             print(f"PASS: all single bit injections passed, no encodings were all zero or all ones")
 
-    def runTestAllDoubleBitInjectionsAC(self, print_all = True, print_errors = True, random_order = False, print_skip=100000, count_addr_as_fail=True):
+    def runTestAllDoubleBitInjectionsAC(self, print_all = True, print_errors = True, random_order = False, print_skip=100000, count_addr_as_fail=True, max_run_time=1e99):
         all_zero_count = 0
         all_one_count = 0
         fail_count = 0
@@ -300,11 +336,28 @@ class ZerosAndOnesTest:
         print_header = True
         i=0
         tests = (1 << bits) * (bits * (bits-1) )
-        if random_order:
+        start_time = time.time()
+        max_time_reached = False
+
+        if bits > 30:
+            print("WARNING: Switching to the incomplete random scheme as the full random scheme will take too long to generate.")
+            random_complete=False
+        else:
+            random_complete=True
+        if random_order and random_complete:
             rng = np.random.default_rng()
             dataRange = rng.permutation(1<<bits)
+        elif random_order and not random_complete:
+            #rng = np.random.default_rng()
+            #dataRange = rng.integers(1<<bits, size=int(max_run_time * 1e6))
+            print("Generating random data...")
+            dataRange = []
+            for i in range(0, int(max_run_time * 1e4)):
+                dataRange.append(random.randint(0, 1<<bits-1))
         else:
             dataRange = range(0, 1<<bits)
+        tests = len(dataRange) * (bits * (bits-1) )
+        print("Starting tests...")
         for unencData in dataRange:
             # first do addresses
             for bit in range(0, self.code.aWidth):
@@ -319,6 +372,13 @@ class ZerosAndOnesTest:
                     fail_count += test_fail
                     print_header = False
                     i+=1
+                    if time.time() - start_time > max_run_time:
+                        print(f"  max run time reached")
+                        max_time_reached = True
+                        break
+                if max_time_reached:
+                    break
+
             # next do data/syndrome
             for bit in range(self.code.aWidth, self.code.encodedWidth()):
                 for bit2 in range(bit+1, self.code.encodedWidth()):
@@ -332,10 +392,20 @@ class ZerosAndOnesTest:
                     fail_count += test_fail
                     print_header = False
                     i+=1
+                    if time.time() - start_time > max_run_time:
+                        print(f"  max run time reached")
+                        max_run_time_reached = True
+                        break
+                if max_time_reached:
+                    break
+            if max_time_reached:
+                break
                 
 
-        if all_zero_count != 0 or all_one_count != 0 or fail_count != 0:
+        if all_zero_count != 0 or all_one_count != 0:
+            print("Note: some zeros after double bit injections.  This is expected. ")
+        if fail_count != 0:
             print(f"FAIL: Some encodings failed")
             print(f" failed: {fail_count}")
         else:
-            print(f"PASS: all double bit injections passed, no encodings were all zero or all ones")        
+            print(f"PASS: all double bit injections passed")        

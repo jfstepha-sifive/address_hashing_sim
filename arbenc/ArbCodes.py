@@ -1,3 +1,5 @@
+import sys
+
 class ArbCodes:
     def __init__(self, dataWidth, totalWidth):
         self.dataWidth = dataWidth
@@ -29,7 +31,38 @@ class ArbCodes:
                     #print(f"  {cw:0{self.totalWidth}b}: {e['data']:0{self.totalWidth}b} ({e['type']})")
             i += 1
 
-    def calcHamming(self, d1, d2):
+    def calcHamming(self, x, y, max_hamming_distance = 999):
+        ans = 0
+        m = max(x, y)
+        while (m):
+            c1 = x & 1
+            c2 = y & 1
+            if (c1 != c2):
+                ans += 1
+                if ans > max_hamming_distance:
+                    return ans
+            m = m >> 1
+            x = x >> 1
+            y = y >> 1
+        return ans
+    
+    def checkHamming(self, x, y, hamming_distance):
+        ans = 0
+        m = max(x, y)
+        while (m):
+            c1 = x & 1
+            c2 = y & 1
+            if (c1 != c2):
+                ans += 1
+                if ans >= hamming_distance:
+                    return True
+            m = m >> 1
+            x = x >> 1
+            y = y >> 1
+        return False
+
+
+    def calcHamming_slow(self, d1, d2):
         s1 = f"{d1:0{self.totalWidth}b}"
         s2 = f"{d2:0{self.totalWidth}b}"
         hamming = 0
@@ -53,9 +86,10 @@ class ArbCodes:
         for i in range(0, self.total_code_words):
             for j in range(0, self.total_code_words):
                 if encoding[i] is not None and encoding[i]['type'] == 'data' and i != j:
+                    hamming = self.calcHamming(i, j, self.uncorrectable_hamming_distance + self.correctable_hamming_distance)
 
                     # check for uncorrectable encoding
-                    if self.calcHamming(i, j) <= self.uncorrectable_hamming_distance and self.calcHamming(i, j) > self.correctable_hamming_distance:
+                    if hamming <= self.uncorrectable_hamming_distance and hamming > self.correctable_hamming_distance == False:
                         # j should be an uncorrectable
                         if encoding[j] is None:
                             encoding[j] = {'data': None, 'type': 'uncorrectable'}
@@ -68,7 +102,7 @@ class ArbCodes:
                             #    print(f"  {j} was already uncorrectable")
                     
                     # check for correctable encoding
-                    elif self.calcHamming(i, j) <= self.correctable_hamming_distance:
+                    elif hamming <= self.correctable_hamming_distance:
                         if encoding[j] is None:
                             encoding[j] = {'data': encoding[i]['data'], 'type': 'correctable'}
                             # print(f"  assigned {j} as correctable")
@@ -85,10 +119,15 @@ class ArbCodes:
         return encoding
 
     def incrementEncoding(self, data_encodings):
-        for i in range(0, self.total_data_words):
+        for i in reversed(range(0, self.total_data_words)):
             data_encodings[i] += 1
             if data_encodings[i] >= self.total_code_words:
-                data_encodings[i] = 0
+                if i == 0:
+                    data_encodings[i] = 0
+                elif data_encodings[i-1] + 1 < self.total_code_words:
+                        data_encodings[i] = data_encodings[i-1] + 1
+                else:
+                    data_encodings[i] = self.total_code_words - 1
             else:
                 return data_encodings
 
@@ -104,7 +143,7 @@ class ArbCodes:
         return False
        
     def findEncodings(self):
-        data_encodings = [0] * self.total_data_words
+        data_encodings = [i for i in range(0, self.total_data_words)]
         done = False 
         i = 0
         while not done:
@@ -120,10 +159,13 @@ class ArbCodes:
             if self.checkduplicates(data_encodings):
                 # print(f"  duplicate data, trying again")
                 encoding = None
+
             # second pass - check for code-to-code hamming distance
             elif self.checkEncodingHammingDistance(encoding):
                 # print(f"  code-to-code hamming distance failed, trying again")
                 encoding = None
+
+            # third pass - assign correctable and uncorrectable encodings
             else:
                 encoding = self.assignAdjacents(encoding)
                 # if encoding is None:
@@ -161,5 +203,10 @@ class ArbCodes:
         
 
 if __name__ == "__main__":
-    code=ArbCodes(3,4)
+    if len(sys.argv) > 2:
+        code=ArbCodes(int(sys.argv[1]), int(sys.argv[2]))
+    else:
+        print("usage: python3 ArbCodes.py <data bits> <total bits>")
+        exit(0)
+    # code=ArbCodes(3,4)
     code.createCode()

@@ -7,14 +7,15 @@ from JulianBaileyUseful.py.protections import ecc
 
 
 class ACSECCodes(ecc.codes.SECCodes.SECCode):
-    def __init__(self, dWidth : int, aWidth : int, odd_parity : bool = False):
+    def __init__(self, dWidth : int, aWidth : int, odd_parity : bool = False, bump_width=False):
         # dWidth and aWidth are the number of data and address bits as inputs
         # these are combined into dataWidth in Julian's library
         self.dWidth = dWidth
         self.aWidth = aWidth
         self.totalWidth = dWidth + aWidth
         self.odd_parity = odd_parity
-        super().__init__(dataWidth = self.totalWidth, odd=self.odd_parity)
+        self.bump_width = bump_width
+        super().__init__(dataWidth = self.totalWidth, odd=self.odd_parity, bump_width=self.bump_width)
         self.syndromeWidth = self.encodedWidth() - self.totalWidth
         if self.encodedWidth() == (2**self.syndromeWidth - 1):
             self.perfectCode=True
@@ -25,6 +26,8 @@ class ACSECCodes(ecc.codes.SECCodes.SECCode):
         m = int(math.log2(self.totalWidth)) + 1
         if (((1 << m) < m + self.totalWidth + 1)):
             m = m + 1
+        if self.bump_width:
+            m += 1
         return m
 
 
