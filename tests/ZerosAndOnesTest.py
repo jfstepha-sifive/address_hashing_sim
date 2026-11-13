@@ -198,7 +198,7 @@ class ZerosAndOnesTest:
         decodedSyndrome = decodedData >> (self.code.dWidth + self.code.aWidth)
 
         all_zero = (injected >> self.code.aWidth) == 0
-        all_one =  (injected >> self.code.aWidth) == (1<<self.code.encodedWidth())-1
+        all_one =  (injected >> self.code.aWidth) == (1<<(self.code.encodedWidth()-self.code.aWidth))-1
         address_fault = decoded.uncorrectable and decoded.address_fault
         
         if bit2 == None:
